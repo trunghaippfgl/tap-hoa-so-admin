@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f5132"><title>Sổ Tạp Hóa Admin V1.1.3</title>
+<meta name="theme-color" content="#0f5132"><title>Sổ Tạp Hóa Admin V1.1.4</title>
 <link rel="manifest" href="manifest.webmanifest">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f7f5;color:#16221a}
@@ -110,7 +110,11 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d7e1db;border-ra
 <div class="row2"><div><label>Ngày bắt đầu</label><input id="mStart" type="date"></div><div><label>Ngày hết hạn</label><input id="mEnd" type="date"></div></div>
 <label>Trạng thái</label><select id="mStatus"><option value="active">Đang hoạt động</option><option value="suspended">Tạm khóa</option><option value="expired">Hết hạn</option></select>
 <label>Ghi chú Admin</label><textarea id="mNote"></textarea>
-<div class="toolbar"><button class="primary" onclick="saveStore()">LƯU</button><button class="secondary" onclick="extendOneYear()">＋ GIA HẠN 1 NĂM</button></div>
+<div class="toolbar">
+<button class="primary" onclick="saveStore()">LƯU</button>
+<button class="secondary" onclick="extendOneYear()">＋ GIA HẠN 1 NĂM</button>
+<button class="danger" onclick="deleteCurrentStore()">🗑️ XÓA CỬA HÀNG</button>
+</div>
 </div></div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -151,7 +155,7 @@ auth.onAuthStateChanged(async u=>{
     if(!a.exists||a.data().active===false)throw new Error('Tài khoản chưa được cấp quyền Admin.');
   }catch(e){
     console.error('Admin verification failed',e);
-    loginStatus.innerHTML='⚠️ Đăng nhập Firebase thành công nhưng Firestore chưa cho đọc quyền Admin.<br><b>'+esc(e.message||e)+'</b><br>Hãy Publish file firestore.rules mới đi kèm bản Admin V1.1.3.';
+    loginStatus.innerHTML='⚠️ Đăng nhập Firebase thành công nhưng Firestore chưa cho đọc quyền Admin.<br><b>'+esc(e.message||e)+'</b><br>Hãy Publish file firestore.rules mới đi kèm bản Admin V1.1.4.';
     loginCard.style.display='block';
     adminArea.style.display='none';
     return;
@@ -273,6 +277,43 @@ async function handleRecoveryRequest(id){
   if(!s)return alert('Chưa xác định được cửa hàng. Hãy tìm theo SĐT/tên rồi xử lý thủ công.');
   openAccountRecovery(s.id);
   await db.collection('recoveryRequests').doc(id).set({status:'in_progress',handledBy:currentAdmin.uid,handledAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+}
+
+
+async function deleteCurrentStore(){
+  const storeId=mStoreId.value;
+  const storeName=mStoreName.value||storeId;
+  if(!storeId)return;
+
+  const typed=prompt(
+    'XÓA VĨNH VIỄN CỬA HÀNG\n\n'+
+    storeName+' ('+storeId+')\n\n'+
+    'Thao tác này sẽ xóa dữ liệu riêng của cửa hàng và tài khoản người dùng liên quan.\n'+
+    'Sản phẩm Cloud chung KHÔNG bị xóa.\n\n'+
+    'Để xác nhận, hãy nhập chính xác mã cửa hàng:\n'+storeId
+  );
+  if(typed===null)return;
+  if(String(typed).trim()!==storeId){
+    alert('Mã xác nhận không đúng. Không có dữ liệu nào bị xóa.');
+    return;
+  }
+
+  if(!confirm('Xác nhận lần cuối: XÓA VĨNH VIỄN '+storeName+'?'))return;
+
+  try{
+    const btns=[...document.querySelectorAll('button')];
+    btns.forEach(b=>b.disabled=true);
+    const call=fn.httpsCallable('adminDeleteStore');
+    const res=await call({storeId,confirmStoreId:typed});
+    alert('✅ '+(res.data.message||'Đã xóa cửa hàng.'));
+    closeModal('storeModal');
+    await loadAll();
+  }catch(e){
+    console.error(e);
+    alert('Không xóa được cửa hàng: '+e.message);
+  }finally{
+    [...document.querySelectorAll('button')].forEach(b=>b.disabled=false);
+  }
 }
 
 async function approveSubmission(id){const s=submissions.find(x=>x.id===id);if(!s)return;const cid=(s.barcode||id).toString();if(s.barcode){const ex=await db.collection('products').doc(s.barcode).get();if(ex.exists&&!confirm('Barcode đã tồn tại. Gộp thông tin vào sản phẩm hiện có?'))return}await db.collection('products').doc(cid).set({barcode:s.barcode||'',name:s.name||'',brand:s.brand||'',category:s.category||'',size:s.size||'',unit:s.unit||'cái',caseSize:Number(s.caseSize)||1,imageUrl:s.imageUrl||'',verificationStatus:'verified',sourceCount:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});await db.collection('productSubmissions').doc(id).set({status:'verified',verifiedAt:firebase.firestore.FieldValue.serverTimestamp(),verifiedBy:currentAdmin.uid,canonicalId:cid},{merge:true});await loadAll()}
