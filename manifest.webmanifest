@@ -1,0 +1,9 @@
+{
+  "name": "Sổ Tạp Hóa Admin V1.1",
+  "short_name": "STH Admin",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f7f5",
+  "theme_color": "#0f5132",
+  "description": "Quản trị thuê bao và hỗ trợ khôi phục tài khoản."
+}

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f5132"><title>Sổ Tạp Hóa Admin V1.1</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f7f5;color:#16221a}
+.app{max-width:1200px;margin:auto;padding:14px 14px 80px}header{display:flex;justify-content:space-between;gap:12px;align-items:center}
+h1,h2{margin:6px 0}.muted{color:#68766e;font-size:13px}.tiny{font-size:12px}
+.card{background:#fff;border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 3px 15px rgba(0,0,0,.06)}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.kpi{font-size:26px;font-weight:800}.label{font-size:12px;color:#6b786f}
+button{border:0;border-radius:11px;padding:10px 13px;font-weight:750;cursor:pointer}.primary{background:#0f5132;color:#fff}.secondary{background:#e8f2ec;color:#0f5132}.danger{background:#ffe3e3;color:#a00000}
+.tabs,.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.tabs{overflow:auto;margin:10px 0}.tab{background:#fff;border:1px solid #dbe5df;white-space:nowrap}.tab.on{background:#0f5132;color:#fff}
+.screen{display:none}.screen.on{display:block}
+input,select,textarea{width:100%;padding:10px;border:1px solid #d7e1db;border-radius:10px;font-size:14px;margin:5px 0 10px}.toolbar input,.toolbar select{width:auto;min-width:180px;margin:0}
+.tablewrap{overflow:auto;max-height:65vh}table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #edf1ee;text-align:left;font-size:13px;vertical-align:top}th{background:#f8faf9;position:sticky;top:0}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:750}.ok{background:#dff5e7;color:#176530}.warn{background:#fff1c8;color:#7a5900}.bad{background:#ffe0e0;color:#9d0000}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:20;align-items:flex-end;justify-content:center}.modal.on{display:flex}.sheet{background:#fff;width:min(720px,100%);max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:16px}.sheethead{display:flex;justify-content:space-between;align-items:center}.x{background:#eee}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:760px){.grid4{grid-template-columns:1fr 1fr}.row2{grid-template-columns:1fr}}
+</style>
+</head>
+<body><div class="app">
+<header><div><h1>🛡️ Sổ Tạp Hóa Admin</h1><div class="muted">Quản trị cửa hàng · thuê bao năm · sản phẩm Cloud</div></div><button class="secondary" onclick="logout()">Đăng xuất</button></header>
+
+<div id="loginCard" class="card">
+<h2>Đăng nhập Admin</h2>
+<label>Email quản trị</label><input id="loginEmail" type="email">
+<label>Mật khẩu</label><input id="loginPass" type="password">
+<button class="primary" onclick="login()">ĐĂNG NHẬP</button><div id="loginStatus" class="muted" style="margin-top:8px"></div>
+</div>
+
+<div id="adminArea" style="display:none">
+<div class="grid4">
+<div class="card"><div class="label">TỔNG CỬA HÀNG</div><div id="kStores" class="kpi">0</div></div>
+<div class="card"><div class="label">CÒN HẠN</div><div id="kActive" class="kpi">0</div></div>
+<div class="card"><div class="label">SẮP HẾT ≤30 NGÀY</div><div id="kExpiring" class="kpi">0</div></div>
+<div class="card"><div class="label">YÊU CẦU HỖ TRỢ</div><div id="kRecovery" class="kpi">0</div></div>
+</div>
+
+<div class="tabs">
+<button class="tab on" onclick="go('stores',this)">🏪 Cửa hàng</button>
+<button class="tab" onclick="go('subscriptions',this)">💳 Thuê bao năm</button>
+<button class="tab" onclick="go('products',this)">📦 Sản phẩm Cloud</button>
+<button class="tab" onclick="go('submissions',this)">✅ Sản phẩm chờ duyệt</button>
+<button class="tab" onclick="go('recovery',this)">🔐 Hỗ trợ tài khoản</button>
+</div>
+
+<section id="stores" class="screen on">
+<div class="card"><div class="toolbar">
+<input id="storeSearch" placeholder="Tìm tên / storeId / chủ..." oninput="renderStores()">
+<select id="storeFilter" onchange="renderStores()"><option value="">Tất cả</option><option value="active">Còn hạn</option><option value="expiring">Sắp hết hạn</option><option value="expired">Hết hạn</option><option value="suspended">Tạm khóa</option></select>
+<button class="secondary" onclick="loadAll()">↻ Làm mới</button>
+</div></div>
+<div class="card tablewrap"><table><thead><tr><th>Cửa hàng</th><th>Chủ</th><th>Thuê bao</th><th>Hoạt động gần nhất</th><th></th></tr></thead><tbody id="storeRows"></tbody></table></div>
+</section>
+
+<section id="subscriptions" class="screen">
+<div class="card"><h2>💳 Thời gian sử dụng</h2><div class="muted">Bạn dự kiến bán theo năm: admin kích hoạt/gia hạn 365 ngày, khóa hoặc mở lại cửa hàng.</div></div>
+<div class="card tablewrap"><table><thead><tr><th>Cửa hàng</th><th>Bắt đầu</th><th>Hết hạn</th><th>Còn lại</th><th>Trạng thái</th><th></th></tr></thead><tbody id="subRows"></tbody></table></div>
+</section>
+
+<section id="products" class="screen">
+<div class="card"><div class="toolbar"><input id="productSearch" placeholder="Tên / barcode / thương hiệu..." oninput="renderProducts()"><button class="secondary" onclick="loadProducts()">↻ Làm mới</button></div></div>
+<div class="card tablewrap"><table><thead><tr><th>Sản phẩm</th><th>Barcode</th><th>Thương hiệu</th><th>Trạng thái</th></tr></thead><tbody id="productRows"></tbody></table></div>
+</section>
+
+<section id="submissions" class="screen">
+<div class="card"><h2>✅ Sản phẩm cửa hàng gửi lên</h2><div class="muted">Duyệt vào catalog chuẩn, gộp với sản phẩm có sẵn hoặc từ chối.</div></div>
+<div class="card tablewrap"><table><thead><tr><th>Sản phẩm</th><th>Cửa hàng nguồn</th><th>Trạng thái</th><th></th></tr></thead><tbody id="submissionRows"></tbody></table></div>
+</section>
+<section id="recovery" class="screen">
+<div class="card">
+<h2>🔐 Hỗ trợ tài khoản cửa hàng</h2>
+<div class="muted">Tìm theo SĐT, tên cửa hàng, chủ cửa hàng, storeId hoặc username.</div>
+<div class="toolbar" style="margin-top:10px">
+<input id="accountSearch" placeholder="SĐT / tên cửa hàng / username..." oninput="renderAccountSearch()">
+<button class="secondary" onclick="loadRecoveryRequests()">↻ Làm mới yêu cầu</button>
+</div>
+<div id="accountSearchRows" style="margin-top:10px"></div>
+</div>
+<div class="card">
+<h2>📨 Yêu cầu quên tài khoản</h2>
+<div class="tablewrap"><table><thead><tr><th>Cửa hàng/SĐT</th><th>Yêu cầu</th><th>Thời gian</th><th>Trạng thái</th><th></th></tr></thead><tbody id="recoveryRows"></tbody></table></div>
+</div>
+</section>
+</div></div>
+
+<div id="accountModal" class="modal"><div class="sheet">
+<div class="sheethead"><h2>🔐 Khôi phục tài khoản</h2><button class="x" onclick="closeModal('accountModal')">✕</button></div>
+<input id="aStoreId" type="hidden"><input id="aOwnerUid" type="hidden">
+<div class="row2"><div><label>Cửa hàng</label><input id="aStoreName" disabled></div><div><label>Số điện thoại</label><input id="aPhone" disabled></div></div>
+<label>Tên đăng nhập hiện tại</label><input id="aCurrentUsername" disabled>
+<label>Tên đăng nhập mới</label><input id="aNewUsername" placeholder="Để trống nếu không đổi">
+<label>Mật khẩu tạm mới</label><input id="aTempPassword" type="text" placeholder="Tối thiểu 6 ký tự">
+<div class="toolbar"><button class="primary" onclick="adminUpdateAccount()">CẬP NHẬT TÀI KHOẢN</button><button class="secondary" onclick="generateTempPassword()">TẠO MẬT KHẨU TẠM</button></div>
+<div id="accountActionStatus" class="muted" style="margin-top:8px"></div>
+</div></div>
+
+<div id="storeModal" class="modal"><div class="sheet">
+<div class="sheethead"><h2>🏪 Quản lý cửa hàng</h2><button class="x" onclick="closeModal('storeModal')">✕</button></div>
+<input id="mStoreId" type="hidden">
+<div class="row2"><div><label>Tên cửa hàng</label><input id="mStoreName"></div><div><label>Chủ cửa hàng</label><input id="mOwnerName"></div></div>
+<div class="row2"><div><label>Ngày bắt đầu</label><input id="mStart" type="date"></div><div><label>Ngày hết hạn</label><input id="mEnd" type="date"></div></div>
+<label>Trạng thái</label><select id="mStatus"><option value="active">Đang hoạt động</option><option value="suspended">Tạm khóa</option><option value="expired">Hết hạn</option></select>
+<label>Ghi chú Admin</label><textarea id="mNote"></textarea>
+<div class="toolbar"><button class="primary" onclick="saveStore()">LƯU</button><button class="secondary" onclick="extendOneYear()">＋ GIA HẠN 1 NĂM</button></div>
+</div></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+<script>
+const firebaseConfig={
+  apiKey:"AIzaSyArZ5l0pinLmc3kNpm_t5M8nj0lCoDeacE",
+  authDomain:"so-tap-hoa-45c79.firebaseapp.com",
+  projectId:"so-tap-hoa-45c79",
+  storageBucket:"so-tap-hoa-45c79.firebasestorage.app",
+  messagingSenderId:"146744756245",
+  appId:"1:146744756245:web:03a4cc1117d3fb3ec5a61c"
+};
+firebase.initializeApp(firebaseConfig);const auth=firebase.auth(),db=firebase.firestore(),fn=firebase.functions();
+let currentAdmin=null,stores=[],products=[],submissions=[],recoveryRequests=[],users=[];
+function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}
+function fmtDate(v){if(!v)return '—';const d=v.toDate?v.toDate():new Date(v);return isNaN(d)?'—':d.toLocaleDateString('vi-VN')}
+function inputDate(v){if(!v)return '';const d=v.toDate?v.toDate():new Date(v);return isNaN(d)?'':d.toISOString().slice(0,10)}
+function daysLeft(v){if(!v)return null;const d=v.toDate?v.toDate():new Date(v);return Math.ceil((d-new Date())/86400000)}
+function state(s){if(s.subscriptionStatus==='suspended')return 'suspended';const n=daysLeft(s.subscriptionEnd);if(n===null||n<0)return 'expired';if(n<=30)return 'expiring';return 'active'}
+function badge(s){const x=state(s);return x==='active'?'<span class="badge ok">Còn hạn</span>':x==='expiring'?'<span class="badge warn">Sắp hết hạn</span>':x==='suspended'?'<span class="badge bad">Tạm khóa</span>':'<span class="badge bad">Hết hạn</span>'}
+
+async function login(){loginStatus.textContent='Đang đăng nhập...';try{await auth.signInWithEmailAndPassword(loginEmail.value.trim(),loginPass.value)}catch(e){loginStatus.textContent=e.message}}
+async function logout(){await auth.signOut()}
+auth.onAuthStateChanged(async u=>{currentAdmin=u;if(!u){loginCard.style.display='block';adminArea.style.display='none';return}try{const a=await db.collection('admins').doc(u.uid).get();if(!a.exists||a.data().active===false)throw new Error('Tài khoản chưa được cấp quyền Admin.');loginCard.style.display='none';adminArea.style.display='block';loginStatus.textContent='';await loadAll()}catch(e){loginStatus.textContent=e.message;await auth.signOut()}});
+function go(id,b){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));document.getElementById(id).classList.add('on');document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));if(b)b.classList.add('on')}
+function closeModal(id){document.getElementById(id).classList.remove('on')}
+
+async function loadAll(){await Promise.all([loadStores(),loadProducts(),loadSubmissions(),loadUsers(),loadRecoveryRequests()]);renderKPIs();renderAccountSearch()}
+async function loadStores(){const q=await db.collection('stores').limit(1000).get();stores=q.docs.map(d=>({id:d.id,...d.data()}));renderStores();renderSubscriptions();renderKPIs()}
+async function loadProducts(){const q=await db.collection('products').limit(5000).get();products=q.docs.map(d=>({id:d.id,...d.data()}));renderProducts()}
+async function loadSubmissions(){const q=await db.collection('productSubmissions').limit(2000).get();submissions=q.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.status!=='verified'&&x.status!=='rejected');renderSubmissions();renderKPIs()}
+function renderKPIs(){kStores.textContent=stores.length;kActive.textContent=stores.filter(x=>state(x)==='active').length;kExpiring.textContent=stores.filter(x=>state(x)==='expiring').length;kRecovery.textContent=recoveryRequests.filter(x=>x.status!=='resolved').length}
+function renderStores(){const q=storeSearch.value.trim().toLowerCase(),f=storeFilter.value;const rows=stores.filter(s=>{const hay=[s.id,s.name,s.ownerName,s.username,s.phone].join(' ').toLowerCase();return(!q||hay.includes(q))&&(!f||state(s)===f)});storeRows.innerHTML=rows.map(s=>`<tr><td><b>${esc(s.name||s.id)}</b><div class="tiny muted">${esc(s.id)}</div></td><td>${esc(s.ownerName||'—')}<div class="tiny muted">${esc(s.phone||'')}</div></td><td>${badge(s)}<div class="tiny">${fmtDate(s.subscriptionEnd)}</div></td><td>${fmtDate(s.lastActiveAt)}</td><td><button class="secondary" onclick="openStore('${s.id}')">Sửa</button></td></tr>`).join('')||'<tr><td colspan="5">Không có dữ liệu</td></tr>'}
+function renderSubscriptions(){subRows.innerHTML=stores.map(s=>{const n=daysLeft(s.subscriptionEnd);return `<tr><td><b>${esc(s.name||s.id)}</b><div class="tiny muted">${esc(s.id)}</div></td><td>${fmtDate(s.subscriptionStart)}</td><td>${fmtDate(s.subscriptionEnd)}</td><td>${n===null?'—':n+' ngày'}</td><td>${badge(s)}</td><td><button class="secondary" onclick="openStore('${s.id}')">Quản lý</button></td></tr>`}).join('')}
+function renderProducts(){const q=productSearch.value.trim().toLowerCase();const rows=products.filter(p=>!q||[p.name,p.barcode,p.brand,p.category].join(' ').toLowerCase().includes(q));productRows.innerHTML=rows.slice(0,1000).map(p=>`<tr><td><b>${esc(p.name||'Không tên')}</b><div class="tiny muted">${esc(p.category||'')}</div></td><td>${esc(p.barcode||p.id)}</td><td>${esc(p.brand||'')}</td><td><span class="badge ok">${esc(p.verificationStatus||'verified')}</span></td></tr>`).join('')}
+function renderSubmissions(){submissionRows.innerHTML=submissions.map(s=>`<tr><td><b>${esc(s.name||'Không tên')}</b><div class="tiny muted">${esc(s.barcode||'Không barcode')} · ${esc(s.brand||'')}</div></td><td>${esc(s.sourceStoreId||'—')}</td><td><span class="badge warn">${esc(s.status||'pending')}</span></td><td><div class="toolbar"><button class="primary" onclick="approveSubmission('${s.id}')">Duyệt</button><button class="secondary" onclick="mergeSubmission('${s.id}')">Gộp</button><button class="danger" onclick="rejectSubmission('${s.id}')">Từ chối</button></div></td></tr>`).join('')||'<tr><td colspan="4">Không có sản phẩm chờ duyệt</td></tr>'}
+function openStore(id){const s=stores.find(x=>x.id===id);if(!s)return;mStoreId.value=s.id;mStoreName.value=s.name||'';mOwnerName.value=s.ownerName||'';mStart.value=inputDate(s.subscriptionStart);mEnd.value=inputDate(s.subscriptionEnd);mStatus.value=s.subscriptionStatus||state(s);mNote.value=s.adminNote||'';storeModal.classList.add('on')}
+async function saveStore(){const id=mStoreId.value;if(!id)return;const st=mStart.value?new Date(mStart.value+'T00:00:00'):null,en=mEnd.value?new Date(mEnd.value+'T23:59:59'):null;await db.collection('stores').doc(id).set({name:mStoreName.value.trim(),ownerName:mOwnerName.value.trim(),subscriptionStart:st?firebase.firestore.Timestamp.fromDate(st):null,subscriptionEnd:en?firebase.firestore.Timestamp.fromDate(en):null,subscriptionStatus:mStatus.value,adminNote:mNote.value.trim(),licenseUpdatedAt:firebase.firestore.FieldValue.serverTimestamp(),licenseUpdatedBy:currentAdmin.uid},{merge:true});closeModal('storeModal');await loadStores()}
+async function extendOneYear(){let d=mEnd.value?new Date(mEnd.value+'T23:59:59'):new Date();if(d<new Date())d=new Date();d.setFullYear(d.getFullYear()+1);if(!mStart.value)mStart.value=new Date().toISOString().slice(0,10);mEnd.value=d.toISOString().slice(0,10);mStatus.value='active';await saveStore()}
+
+async function loadUsers(){const q=await db.collection('users').limit(3000).get();users=q.docs.map(d=>({id:d.id,...d.data()}))}
+async function loadRecoveryRequests(){
+  const q=await db.collection('recoveryRequests').limit(1000).get();
+  recoveryRequests=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>{
+    const ta=a.createdAt&&a.createdAt.toMillis?a.createdAt.toMillis():0,tb=b.createdAt&&b.createdAt.toMillis?b.createdAt.toMillis():0;return tb-ta
+  });
+  renderRecoveryRequests();renderKPIs();
+}
+function renderAccountSearch(){
+  const box=document.getElementById('accountSearchRows');if(!box)return;
+  const q=(document.getElementById('accountSearch')?.value||'').trim().toLowerCase();
+  if(!q){box.innerHTML='<div class="muted">Nhập SĐT, tên cửa hàng, chủ cửa hàng, storeId hoặc username để tìm.</div>';return}
+  const rows=stores.filter(s=>{
+    const owner=users.find(u=>u.storeId===s.id&&u.role==='owner')||{};
+    return [s.id,s.name,s.ownerName,s.phone,s.username,owner.username].join(' ').toLowerCase().includes(q)
+  }).slice(0,20);
+  box.innerHTML=rows.length?rows.map(s=>{
+    const owner=users.find(u=>u.storeId===s.id&&u.role==='owner')||{};
+    return `<div class="card" style="box-shadow:none;border:1px solid #e6ece8">
+      <b>${esc(s.name||s.id)}</b>
+      <div class="tiny muted">${esc(s.id)} · Chủ: ${esc(s.ownerName||'—')} · SĐT: ${esc(s.phone||'—')}</div>
+      <div class="tiny">Username: <b>${esc(owner.username||s.username||'—')}</b></div>
+      <button class="secondary" style="margin-top:8px" onclick="openAccountRecovery('${s.id}')">HỖ TRỢ TÀI KHOẢN</button>
+    </div>`
+  }).join(''):'<div class="muted">Không tìm thấy cửa hàng phù hợp.</div>';
+}
+function renderRecoveryRequests(){
+  const box=document.getElementById('recoveryRows');if(!box)return;
+  box.innerHTML=recoveryRequests.map(r=>`<tr>
+    <td><b>${esc(r.storeName||'Chưa xác định')}</b><div class="tiny muted">${esc(r.phone||'')}</div></td>
+    <td>${r.issue==='forgot_password'?'Quên mật khẩu':'Quên tên đăng nhập'}<div class="tiny muted">${esc(r.note||'')}</div></td>
+    <td>${fmtDate(r.createdAt)}</td>
+    <td><span class="badge ${r.status==='resolved'?'ok':'warn'}">${esc(r.status||'pending')}</span></td>
+    <td>${r.status==='resolved'?'':`<button class="secondary" onclick="handleRecoveryRequest('${r.id}')">Xử lý</button>`}</td>
+  </tr>`).join('')||'<tr><td colspan="5">Chưa có yêu cầu hỗ trợ</td></tr>';
+}
+function openAccountRecovery(storeId){
+  const s=stores.find(x=>x.id===storeId);if(!s)return;
+  const owner=users.find(u=>u.storeId===storeId&&u.role==='owner')||{};
+  aStoreId.value=storeId;aOwnerUid.value=s.ownerUid||owner.id||'';
+  aStoreName.value=s.name||storeId;aPhone.value=s.phone||'';
+  aCurrentUsername.value=owner.username||s.username||'';
+  aNewUsername.value='';aTempPassword.value='';accountActionStatus.textContent='';
+  accountModal.classList.add('on');
+}
+function generateTempPassword(){const c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';let out='STH-';for(let i=0;i<8;i++)out+=c[Math.floor(Math.random()*c.length)];aTempPassword.value=out}
+async function adminUpdateAccount(){
+  const uid=aOwnerUid.value,storeId=aStoreId.value,newUsername=aNewUsername.value.trim(),newPassword=aTempPassword.value;
+  if(!uid||!storeId)return alert('Thiếu UID/storeId.');
+  if(!newUsername&&!newPassword)return alert('Nhập username mới hoặc mật khẩu tạm.');
+  if(newPassword&&newPassword.length<6)return alert('Mật khẩu tối thiểu 6 ký tự.');
+  accountActionStatus.textContent='Đang cập nhật...';
+  try{
+    const res=await fn.httpsCallable('adminUpdateStoreAccount')({uid,storeId,newUsername,newPassword});
+    accountActionStatus.textContent='✅ '+(res.data.message||'Đã cập nhật tài khoản');
+    await Promise.all([loadStores(),loadUsers()]);
+    aCurrentUsername.value=(users.find(u=>u.id===uid)||{}).username||newUsername||aCurrentUsername.value;
+    aNewUsername.value='';
+  }catch(e){accountActionStatus.textContent='⚠️ '+e.message}
+}
+async function handleRecoveryRequest(id){
+  const r=recoveryRequests.find(x=>x.id===id);if(!r)return;
+  let s=r.storeId?stores.find(x=>x.id===r.storeId):null;
+  if(!s&&r.phone)s=stores.find(x=>String(x.phone||'').replace(/\D/g,'')===String(r.phone||'').replace(/\D/g,''));
+  if(!s)return alert('Chưa xác định được cửa hàng. Hãy tìm theo SĐT/tên rồi xử lý thủ công.');
+  openAccountRecovery(s.id);
+  await db.collection('recoveryRequests').doc(id).set({status:'in_progress',handledBy:currentAdmin.uid,handledAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+}
+
+async function approveSubmission(id){const s=submissions.find(x=>x.id===id);if(!s)return;const cid=(s.barcode||id).toString();if(s.barcode){const ex=await db.collection('products').doc(s.barcode).get();if(ex.exists&&!confirm('Barcode đã tồn tại. Gộp thông tin vào sản phẩm hiện có?'))return}await db.collection('products').doc(cid).set({barcode:s.barcode||'',name:s.name||'',brand:s.brand||'',category:s.category||'',size:s.size||'',unit:s.unit||'cái',caseSize:Number(s.caseSize)||1,imageUrl:s.imageUrl||'',verificationStatus:'verified',sourceCount:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});await db.collection('productSubmissions').doc(id).set({status:'verified',verifiedAt:firebase.firestore.FieldValue.serverTimestamp(),verifiedBy:currentAdmin.uid,canonicalId:cid},{merge:true});await loadAll()}
+async function mergeSubmission(id){const s=submissions.find(x=>x.id===id);if(!s)return;const target=prompt('Nhập barcode hoặc document ID sản phẩm chuẩn:');if(!target)return;const ref=db.collection('products').doc(target),ex=await ref.get();if(!ex.exists)return alert('Không tìm thấy sản phẩm chuẩn.');await ref.set({sourceCount:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});await db.collection('productSubmissions').doc(id).set({status:'verified',mergeType:'merged',canonicalId:target,verifiedAt:firebase.firestore.FieldValue.serverTimestamp(),verifiedBy:currentAdmin.uid},{merge:true});await loadAll()}
+async function rejectSubmission(id){const reason=prompt('Lý do từ chối:');if(!reason)return;await db.collection('productSubmissions').doc(id).set({status:'rejected',rejectReason:reason,rejectedAt:firebase.firestore.FieldValue.serverTimestamp(),rejectedBy:currentAdmin.uid},{merge:true});await loadSubmissions()}
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(console.warn);
+</script></body></html>
