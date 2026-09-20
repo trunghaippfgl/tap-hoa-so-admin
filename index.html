@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f5132"><title>Sổ Tạp Hóa Admin V1.1.4</title>
+<meta name="theme-color" content="#0f5132"><title>Sổ Tạp Hóa Admin V1.1.5</title>
 <link rel="manifest" href="manifest.webmanifest">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f7f5;color:#16221a}
@@ -22,7 +22,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d7e1db;border-ra
 </style>
 </head>
 <body><div class="app">
-<header><div><h1>🛡️ Sổ Tạp Hóa Admin</h1><div class="muted">Quản trị cửa hàng · thuê bao năm · sản phẩm Cloud</div></div><button class="secondary" onclick="logout()">Đăng xuất</button></header>
+<header><div><h1>🛡️ Sổ Tạp Hóa Admin</h1><div class="muted">Quản trị cửa hàng · thuê bao năm · sản phẩm Cloud</div><div style="margin-top:4px;font-size:12px;font-weight:800;color:#0f5132">Phiên bản: V1.1.5 · Cache Fix</div></div><button class="secondary" onclick="logout()">Đăng xuất</button></header>
 
 <div id="loginCard" class="card">
 <h2>Đăng nhập Admin</h2>
@@ -130,6 +130,11 @@ const firebaseConfig={
   messagingSenderId:"146744756245",
   appId:"1:146744756245:web:03a4cc1117d3fb3ec5a61c"
 };
+const APP_VERSION='V1.1.5-cache-fix';
+window.addEventListener('load',()=>{
+  console.log('Sổ Tạp Hóa Admin',APP_VERSION);
+});
+
 firebase.initializeApp(firebaseConfig);const auth=firebase.auth(),db=firebase.firestore(),fn=firebase.functions();
 let currentAdmin=null,stores=[],products=[],submissions=[],recoveryRequests=[],users=[];
 function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}
@@ -155,7 +160,7 @@ auth.onAuthStateChanged(async u=>{
     if(!a.exists||a.data().active===false)throw new Error('Tài khoản chưa được cấp quyền Admin.');
   }catch(e){
     console.error('Admin verification failed',e);
-    loginStatus.innerHTML='⚠️ Đăng nhập Firebase thành công nhưng Firestore chưa cho đọc quyền Admin.<br><b>'+esc(e.message||e)+'</b><br>Hãy Publish file firestore.rules mới đi kèm bản Admin V1.1.4.';
+    loginStatus.innerHTML='⚠️ Đăng nhập Firebase thành công nhưng Firestore chưa cho đọc quyền Admin.<br><b>'+esc(e.message||e)+'</b><br>Hãy Publish file firestore.rules mới đi kèm bản Admin V1.1.5.';
     loginCard.style.display='block';
     adminArea.style.display='none';
     return;
@@ -319,5 +324,15 @@ async function deleteCurrentStore(){
 async function approveSubmission(id){const s=submissions.find(x=>x.id===id);if(!s)return;const cid=(s.barcode||id).toString();if(s.barcode){const ex=await db.collection('products').doc(s.barcode).get();if(ex.exists&&!confirm('Barcode đã tồn tại. Gộp thông tin vào sản phẩm hiện có?'))return}await db.collection('products').doc(cid).set({barcode:s.barcode||'',name:s.name||'',brand:s.brand||'',category:s.category||'',size:s.size||'',unit:s.unit||'cái',caseSize:Number(s.caseSize)||1,imageUrl:s.imageUrl||'',verificationStatus:'verified',sourceCount:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});await db.collection('productSubmissions').doc(id).set({status:'verified',verifiedAt:firebase.firestore.FieldValue.serverTimestamp(),verifiedBy:currentAdmin.uid,canonicalId:cid},{merge:true});await loadAll()}
 async function mergeSubmission(id){const s=submissions.find(x=>x.id===id);if(!s)return;const target=prompt('Nhập barcode hoặc document ID sản phẩm chuẩn:');if(!target)return;const ref=db.collection('products').doc(target),ex=await ref.get();if(!ex.exists)return alert('Không tìm thấy sản phẩm chuẩn.');await ref.set({sourceCount:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});await db.collection('productSubmissions').doc(id).set({status:'verified',mergeType:'merged',canonicalId:target,verifiedAt:firebase.firestore.FieldValue.serverTimestamp(),verifiedBy:currentAdmin.uid},{merge:true});await loadAll()}
 async function rejectSubmission(id){const reason=prompt('Lý do từ chối:');if(!reason)return;await db.collection('productSubmissions').doc(id).set({status:'rejected',rejectReason:reason,rejectedAt:firebase.firestore.FieldValue.serverTimestamp(),rejectedBy:currentAdmin.uid},{merge:true});await loadSubmissions()}
-if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(console.warn);
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').then(reg=>{
+    reg.update().catch(()=>{});
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      if(!sessionStorage.getItem('sw-reloaded')){
+        sessionStorage.setItem('sw-reloaded','1');
+        location.reload();
+      }
+    });
+  }).catch(console.warn);
+}
 </script></body></html>

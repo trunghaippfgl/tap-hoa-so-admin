@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>Reset Admin Cache</title>
+<body style="font-family:system-ui;padding:30px">
+<h2>Đang xóa cache Sổ Tạp Hóa Admin...</h2><div id="s"></div>
+<script>
+(async()=>{
+  try{
+    if('serviceWorker' in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      for(const r of regs) await r.unregister();
+    }
+    const keys=await caches.keys();
+    for(const k of keys) await caches.delete(k);
+    localStorage.removeItem('sw-reloaded');
+    sessionStorage.clear();
+    s.innerHTML='✅ Đã xóa cache. <a href="./">Bấm vào đây để mở lại Admin V1.1.5</a>';
+  }catch(e){s.textContent='Lỗi: '+e.message}
+})();
+</script></body>
