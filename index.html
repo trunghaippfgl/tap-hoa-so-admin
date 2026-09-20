@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f5132"><title>Sổ Tạp Hóa Admin V1.1</title>
+<meta name="theme-color" content="#0f5132"><title>Sổ Tạp Hóa Admin V1.1.1</title>
 <link rel="manifest" href="manifest.webmanifest">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f7f5;color:#16221a}
@@ -32,6 +32,11 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d7e1db;border-ra
 </div>
 
 <div id="adminArea" style="display:none">
+<div id="systemStatus" class="card" style="display:none;border:1px solid #ffd9a8;background:#fffaf3">
+  <b>⚠️ Trạng thái kết nối</b>
+  <div id="systemStatusText" class="muted" style="margin-top:5px"></div>
+</div>
+
 <div class="grid4">
 <div class="card"><div class="label">TỔNG CỬA HÀNG</div><div id="kStores" class="kpi">0</div></div>
 <div class="card"><div class="label">CÒN HẠN</div><div id="kActive" class="kpi">0</div></div>
@@ -130,13 +135,64 @@ function daysLeft(v){if(!v)return null;const d=v.toDate?v.toDate():new Date(v);r
 function state(s){if(s.subscriptionStatus==='suspended')return 'suspended';const n=daysLeft(s.subscriptionEnd);if(n===null||n<0)return 'expired';if(n<=30)return 'expiring';return 'active'}
 function badge(s){const x=state(s);return x==='active'?'<span class="badge ok">Còn hạn</span>':x==='expiring'?'<span class="badge warn">Sắp hết hạn</span>':x==='suspended'?'<span class="badge bad">Tạm khóa</span>':'<span class="badge bad">Hết hạn</span>'}
 
-async function login(){loginStatus.textContent='Đang đăng nhập...';try{await auth.signInWithEmailAndPassword(loginEmail.value.trim(),loginPass.value)}catch(e){loginStatus.textContent=e.message}}
+async function login(){loginStatus.textContent='Đang đăng nhập...';try{await auth.signInWithEmailAndPassword(loginEmail.value.trim(),loginPass.value)}catch(e){loginStatus.textContent='Đăng nhập lỗi: '+e.message}}
 async function logout(){await auth.signOut()}
-auth.onAuthStateChanged(async u=>{currentAdmin=u;if(!u){loginCard.style.display='block';adminArea.style.display='none';return}try{const a=await db.collection('admins').doc(u.uid).get();if(!a.exists||a.data().active===false)throw new Error('Tài khoản chưa được cấp quyền Admin.');loginCard.style.display='none';adminArea.style.display='block';loginStatus.textContent='';await loadAll()}catch(e){loginStatus.textContent=e.message;await auth.signOut()}});
+auth.onAuthStateChanged(async u=>{
+  currentAdmin=u;
+  if(!u){
+    loginCard.style.display='block';
+    adminArea.style.display='none';
+    return;
+  }
+
+  // Phase 1: only verify Admin permission here.
+  try{
+    const a=await db.collection('admins').doc(u.uid).get();
+    if(!a.exists||a.data().active===false)throw new Error('Tài khoản chưa được cấp quyền Admin.');
+  }catch(e){
+    loginStatus.textContent='Không xác minh được quyền Admin: '+e.message;
+    loginCard.style.display='block';
+    adminArea.style.display='none';
+    return;
+  }
+
+  // Phase 2: Admin is valid. Never auto-logout just because one data module cannot load.
+  loginCard.style.display='none';
+  adminArea.style.display='block';
+  loginStatus.textContent='';
+  await loadAllSafe();
+});
 function go(id,b){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));document.getElementById(id).classList.add('on');document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));if(b)b.classList.add('on')}
 function closeModal(id){document.getElementById(id).classList.remove('on')}
 
-async function loadAll(){await Promise.all([loadStores(),loadProducts(),loadSubmissions(),loadUsers(),loadRecoveryRequests()]);renderKPIs();renderAccountSearch()}
+async function loadAllSafe(){
+  const errors=[];
+  async function run(label,fn){
+    try{await fn()}catch(e){
+      console.error(label,e);
+      errors.push(label+': '+(e.message||e));
+    }
+  }
+  await run('Cửa hàng',loadStores);
+  await run('Sản phẩm Cloud',loadProducts);
+  await run('Sản phẩm chờ duyệt',loadSubmissions);
+  await run('Users',loadUsers);
+  await run('Yêu cầu hỗ trợ',loadRecoveryRequests);
+
+  renderKPIs();
+  renderAccountSearch();
+
+  const box=document.getElementById('systemStatus');
+  const txt=document.getElementById('systemStatusText');
+  if(errors.length){
+    box.style.display='block';
+    txt.innerHTML='Admin đã đăng nhập thành công, nhưng có module chưa đọc được Firestore:<br>• '+errors.map(esc).join('<br>• ')+'<br><br>Hãy kiểm tra Firestore Rules tương ứng.';
+  }else{
+    box.style.display='none';
+    txt.textContent='';
+  }
+}
+async function loadAll(){return loadAllSafe()}
 async function loadStores(){const q=await db.collection('stores').limit(1000).get();stores=q.docs.map(d=>({id:d.id,...d.data()}));renderStores();renderSubscriptions();renderKPIs()}
 async function loadProducts(){const q=await db.collection('products').limit(5000).get();products=q.docs.map(d=>({id:d.id,...d.data()}));renderProducts()}
 async function loadSubmissions(){const q=await db.collection('productSubmissions').limit(2000).get();submissions=q.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.status!=='verified'&&x.status!=='rejected');renderSubmissions();renderKPIs()}
