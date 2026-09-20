@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f5132"><title>Sổ Tạp Hóa Admin V1.1.1</title>
+<meta name="theme-color" content="#0f5132"><title>Sổ Tạp Hóa Admin V1.1.3</title>
 <link rel="manifest" href="manifest.webmanifest">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f7f5;color:#16221a}
@@ -150,7 +150,8 @@ auth.onAuthStateChanged(async u=>{
     const a=await db.collection('admins').doc(u.uid).get();
     if(!a.exists||a.data().active===false)throw new Error('Tài khoản chưa được cấp quyền Admin.');
   }catch(e){
-    loginStatus.textContent='Không xác minh được quyền Admin: '+e.message;
+    console.error('Admin verification failed',e);
+    loginStatus.innerHTML='⚠️ Đăng nhập Firebase thành công nhưng Firestore chưa cho đọc quyền Admin.<br><b>'+esc(e.message||e)+'</b><br>Hãy Publish file firestore.rules mới đi kèm bản Admin V1.1.3.';
     loginCard.style.display='block';
     adminArea.style.display='none';
     return;
